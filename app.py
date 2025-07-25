@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-# Streamlit app title
+st.set_page_config(page_title="Heart Disease Prediction", layout="wide")
 st.title("Heart Disease Prediction App")
 
 # Load dataset
@@ -22,70 +22,61 @@ def load_data():
         return None
 
 df = load_data()
+
 if df is not None:
     st.subheader("Dataset Preview")
     st.write(df.head())
 
-    # EDA
-    st.subheader("Basic Info")
-    st.write("Shape of dataset:", df.shape)
-    st.write("Columns:", df.columns.tolist())
-    st.write("Missing values per column:")
-    st.write(df.isnull().sum())
-
-    st.subheader("Descriptive Statistics")
-    st.write(df.describe())
-
-    st.subheader("Target Distribution")
-    fig1, ax1 = plt.subplots()
-    df['target'].value_counts().plot(kind='bar', ax=ax1)
-    ax1.set_title('Distribution of Target Variable')
-    ax1.set_xlabel('Heart Disease (1=Yes, 0=No)')
-    ax1.set_ylabel('Count')
-    st.pyplot(fig1)
-
-    st.subheader("Age Distribution")
-    fig2, ax2 = plt.subplots()
-    sns.histplot(df['age'], bins=20, kde=True, ax=ax2)
-    ax2.set_title('Age Distribution')
-    st.pyplot(fig2)
-
-    st.subheader("Chest Pain Type Distribution")
-    fig3, ax3 = plt.subplots()
-    sns.countplot(x='cp', data=df, ax=ax3)
-    ax3.set_title('Chest Pain Type Distribution')
-    ax3.set_xlabel('Chest Pain Type (0-3)')
-    st.pyplot(fig3)
-
-    # Optional: Pairplot (may be slow)
-    if st.checkbox("Show pairplot (may be slow)", False):
-        st.subheader("Pairplot of Selected Features")
-        fig4 = sns.pairplot(df, vars=['age', 'trestbps', 'chol', 'thalach', 'oldpeak'], hue='target')
-        st.pyplot(fig4)
-
-    st.subheader("Boxplots for Outlier Detection")
-    numeric_features = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak']
-    fig5, axs = plt.subplots(2, 3, figsize=(15, 8))
-    axs = axs.flatten()
-    for i, col in enumerate(numeric_features):
-        sns.boxplot(y=df[col], ax=axs[i])
-        axs[i].set_title(f'{col}')
-    plt.tight_layout()
-    st.pyplot(fig5)
-
     # Split data and train model
-    st.subheader("Model Training & Prediction")
     X = df.drop(columns='target')
     y = df['target']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train, y_train)
 
-    y_pred = model.predict(X_test)
+    # Sidebar: user input
+    st.sidebar.header("Patient Input Features")
+    def user_input():
+        age = st.sidebar.slider("Age", 29, 77, 54)
+        sex = st.sidebar.selectbox("Sex", options=[0, 1], format_func=lambda x: "Female" if x == 0 else "Male")
+        cp = st.sidebar.selectbox("Chest Pain Type (0–3)", [0, 1, 2, 3])
+        trestbps = st.sidebar.slider("Resting Blood Pressure (mm Hg)", 90, 200, 130)
+        chol = st.sidebar.slider("Cholesterol (mg/dl)", 100, 600, 250)
+        fbs = st.sidebar.selectbox("Fasting Blood Sugar > 120 mg/dl", [0, 1])
+        restecg = st.sidebar.selectbox("Resting ECG Results", [0, 1, 2])
+        thalach = st.sidebar.slider("Max Heart Rate Achieved", 70, 210, 150)
+        exang = st.sidebar.selectbox("Exercise Induced Angina", [0, 1])
+        oldpeak = st.sidebar.slider("ST Depression", 0.0, 6.0, 1.0, step=0.1)
+        slope = st.sidebar.selectbox("Slope of Peak Exercise ST", [0, 1, 2])
+        ca = st.sidebar.selectbox("Number of Major Vessels (0-4)", [0, 1, 2, 3, 4])
+        thal = st.sidebar.selectbox("Thalassemia", [0, 1, 2, 3])
 
-    st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
+        data = {
+            'age': age, 'sex': sex, 'cp': cp, 'trestbps': trestbps,
+            'chol': chol, 'fbs': fbs, 'restecg': restecg, 'thalach': thalach,
+            'exang': exang, 'oldpeak': oldpeak, 'slope': slope, 'ca': ca, 'thal': thal
+        }
+        return pd.DataFrame(data, index=[0])
+
+    input_df = user_input()
+
+    st.subheader("User Input")
+    st.write(input_df)
+
+    # Prediction
+    prediction = model.predict(input_df)
+    prediction_proba = model.predict_proba(input_df)
+
+    st.subheader("Prediction Result")
+    st.write("Prediction:", "Heart Disease" if prediction[0] == 1 else "No Heart Disease")
+    st.write("Prediction Probability:", prediction_proba[0])
+
+    # Evaluation
+    st.subheader("Model Evaluation on Test Set")
+    y_pred = model.predict(X_test)
+    st.write("Accuracy Score:", accuracy_score(y_test, y_pred))
     st.write("Confusion Matrix:")
     st.write(confusion_matrix(y_test, y_pred))
-    st.write("Classification Report:")
+    st.text("Classification Report:")
     st.text(classification_report(y_test, y_pred))
+
